@@ -31,7 +31,8 @@ export default function AppHeader() {
 
   const handleLogout = async () => {
     try {
-      await authApi.logout()
+      const refreshToken = localStorage.getItem('refreshToken') || ''
+      await authApi.logout(refreshToken)
     } catch {
       // ignore
     } finally {

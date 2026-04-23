@@ -1,3 +1,12 @@
+"""
+Room views — fixed version.
+
+Fixes:
+1. AvailableRoomsView properly handles missing query params
+2. RoomStatusUpdateView logs changes correctly
+3. All views return proper status codes
+"""
+
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,7 +18,12 @@ from apps.users.permissions import IsAdminOrManager, IsStaffMember
 
 
 class RoomListCreateView(generics.ListCreateAPIView):
-    """GET /api/v1/rooms/  |  POST /api/v1/rooms/"""
+    """
+    GET  /api/v1/rooms/  — list all rooms
+    POST /api/v1/rooms/  — create room (admin/manager only)
+
+    Filters: ?status=available&room_type=vip&floor=2
+    """
     serializer_class = RoomSerializer
 
     def get_permissions(self):
@@ -23,11 +37,23 @@ class RoomListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(status=s)
         if t := self.request.query_params.get('room_type'):
             qs = qs.filter(room_type=t)
+        if f := self.request.query_params.get('floor'):
+            qs = qs.filter(floor=f)
         return qs
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PUT/DELETE /api/v1/rooms/<id>/"""
+    """
+    GET    /api/v1/rooms/<id>/
+    PUT    /api/v1/rooms/<id>/
+    DELETE /api/v1/rooms/<id>/
+    """
     queryset         = Room.objects.all()
     serializer_class = RoomSerializer
 
@@ -38,45 +64,79 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class RoomStatusUpdateView(APIView):
-    """PATCH /api/v1/rooms/<id>/status/"""
+    """
+    PATCH /api/v1/rooms/<id>/status/
+    Body: {"status": "cleaning", "reason": "Guest checked out"}
+    """
     permission_classes = [IsStaffMember]
 
     def patch(self, request, pk):
-        room = generics.get_object_or_404(Room, pk=pk)
-        s = RoomStatusUpdateSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
+        try:
+            room = Room.objects.get(pk=pk)
+        except Room.DoesNotExist:
+            return Response(
+                {'error': 'Room not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = RoomStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         old_status = room.status
-        new_status = s.validated_data['status']
+        new_status = serializer.validated_data['status']
 
+        # Log the status change
         RoomStatusLog.objects.create(
-            room=room, old_status=old_status, new_status=new_status,
-            changed_by=request.user, reason=s.validated_data.get('reason', ''),
+            room=room,
+            old_status=old_status,
+            new_status=new_status,
+            changed_by=request.user,
+            reason=serializer.validated_data.get('reason', ''),
         )
+
         room.status = new_status
         room.save(update_fields=['status', 'updated_at'])
-        return Response(RoomSerializer(room).data)
+
+        return Response({
+            'message': f'Room status changed from {old_status} to {new_status}.',
+            'room': RoomSerializer(room).data,
+        })
 
 
 class AvailableRoomsView(generics.ListAPIView):
-    """GET /api/v1/rooms/available/?check_in=2024-05-01&check_out=2024-05-05"""
+    """
+    GET /api/v1/rooms/available/
+    Query params: check_in, check_out, room_type (optional), capacity (optional)
+
+    Example: /api/v1/rooms/available/?check_in=2024-05-01&check_out=2024-05-05
+    """
     serializer_class   = RoomSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         check_in  = self.request.query_params.get('check_in')
         check_out = self.request.query_params.get('check_out')
-        if not check_in or not check_out:
-            return Room.objects.filter(status=Room.Status.AVAILABLE)
 
-        from apps.bookings.models import Booking
-        booked_ids = Booking.objects.filter(
-            status__in=[Booking.Status.CONFIRMED, Booking.Status.CHECKED_IN],
-            check_in__lt=check_out,
-            check_out__gt=check_in,
-        ).values_list('room_id', flat=True)
+        # Start with all available rooms
+        qs = Room.objects.filter(status=Room.Status.AVAILABLE)
 
-        return Room.objects.exclude(id__in=booked_ids).filter(status=Room.Status.AVAILABLE)
+        # If dates provided, exclude rooms with overlapping bookings
+        if check_in and check_out:
+            from apps.bookings.models import Booking
+            booked_ids = Booking.objects.filter(
+                status__in=[Booking.Status.CONFIRMED, Booking.Status.CHECKED_IN],
+                check_in__lt=check_out,
+                check_out__gt=check_in,
+            ).values_list('room_id', flat=True)
+            qs = qs.exclude(id__in=booked_ids)
+
+        # Optional filters
+        if t := self.request.query_params.get('room_type'):
+            qs = qs.filter(room_type=t)
+        if cap := self.request.query_params.get('capacity'):
+            qs = qs.filter(capacity__gte=cap)
+
+        return qs
 
 
 class RoomStatusLogView(generics.ListAPIView):
@@ -85,4 +145,6 @@ class RoomStatusLogView(generics.ListAPIView):
     permission_classes = [IsStaffMember]
 
     def get_queryset(self):
-        return RoomStatusLog.objects.filter(room_id=self.kwargs['pk'])
+        return RoomStatusLog.objects.filter(
+            room_id=self.kwargs['pk']
+        ).select_related('changed_by')

@@ -1,13 +1,11 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
-const BASE_URL = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 })
 
 // Request interceptor — JWT token qo'shish
@@ -38,10 +36,13 @@ axiosInstance.interceptors.response.use(
           return Promise.reject(error)
         }
 
-        const response = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken })
-        const { accessToken } = response.data
-        localStorage.setItem('accessToken', accessToken)
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`
+        // Django simplejwt refresh endpoint
+        const response = await axios.post(`${BASE_URL}/auth/token/refresh/`, {
+          refresh: refreshToken,
+        })
+        const { access } = response.data
+        localStorage.setItem('accessToken', access)
+        originalRequest.headers.Authorization = `Bearer ${access}`
         return axiosInstance(originalRequest)
       } catch {
         localStorage.clear()
