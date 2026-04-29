@@ -4,6 +4,7 @@ Reporting views — aggregated statistics for the dashboard and management.
 
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -18,8 +19,9 @@ class DashboardStatsView(APIView):
     """
     GET /api/v1/reports/dashboard/
     Quick stats for the main dashboard card widgets.
+    All authenticated staff can view (customers excluded).
     """
-    permission_classes = [IsAdminOrManager]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         today = timezone.now().date()

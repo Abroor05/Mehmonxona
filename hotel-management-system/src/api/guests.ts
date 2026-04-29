@@ -6,10 +6,10 @@ const normalize = (u: Record<string, unknown>): Guest => ({
   id:            String(u.id),
   firstName:     u.first_name as string,
   lastName:      u.last_name as string,
-  passportNumber: u.passport_number as string || '',
-  phone:         u.phone as string,
+  passportNumber: '',   // Django User modelida passport_number yo'q
+  phone:         u.phone as string || '',
   email:         u.email as string,
-  nationality:   u.nationality as string | undefined,
+  nationality:   undefined,
   createdAt:     u.created_at as string,
   updatedAt:     u.updated_at as string,
 })
@@ -58,26 +58,23 @@ export const guestsApi = {
 
   create: async (data: CreateGuestDto): Promise<Guest> => {
     const response = await axiosInstance.post('/auth/users/', {
-      first_name:      data.firstName,
-      last_name:       data.lastName,
-      passport_number: data.passportNumber,
-      phone:           data.phone,
-      email:           data.email,
-      nationality:     data.nationality,
-      role:            'customer',
-      username:        data.email.split('@')[0] + '_' + Date.now(),
-      password:        'TempPass123!',
+      first_name: data.firstName,
+      last_name:  data.lastName,
+      phone:      data.phone,
+      email:      data.email,
+      role:       'customer',
+      username:   data.email.split('@')[0] + '_' + Date.now(),
+      password:   'TempPass123!',
     })
     return normalize(response.data)
   },
 
   update: async (id: string, data: UpdateGuestDto): Promise<Guest> => {
     const response = await axiosInstance.patch(`/auth/users/${id}/`, {
-      first_name:  data.firstName,
-      last_name:   data.lastName,
-      phone:       data.phone,
-      email:       data.email,
-      nationality: data.nationality,
+      first_name: data.firstName,
+      last_name:  data.lastName,
+      phone:      data.phone,
+      email:      data.email,
     })
     return normalize(response.data)
   },

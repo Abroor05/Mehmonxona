@@ -3,76 +3,163 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import {
   Card, Form, Input, Button, Steps, Typography, Space,
-  Descriptions, Tag, Alert, message, Row, Col, DatePicker, Select, InputNumber,
+  Descriptions, Tag, Alert, message, Spin,
 } from 'antd'
 import { SearchOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons'
+import axiosInstance from '../../api/axiosInstance'
 import { bookingsApi } from '../../api/bookings'
-import { Booking, CheckInDto } from '../../types'
-import { BookingStatus, RoomType } from '../../types/enums'
-import dayjs from 'dayjs'
+import { Booking } from '../../types'
+import { BookingStatus } from '../../types/enums'
 
 const { Title, Text } = Typography
-const { Option } = Select
 
-const roomTypeLabels: Record<RoomType, string> = {
-  [RoomType.STANDARD]: 'Standard',
-  [RoomType.LUX]: 'Lux',
-  [RoomType.VIP]: 'VIP',
+const statusConfig: Record<BookingStatus, { label: string; color: string }> = {
+  [BookingStatus.PENDING]:     { label: 'Kutilmoqda',     color: 'orange'  },
+  [BookingStatus.CONFIRMED]:   { label: 'Tasdiqlangan',   color: 'blue'    },
+  [BookingStatus.CHECKED_IN]:  { label: 'Kirgan',         color: 'green'   },
+  [BookingStatus.CHECKED_OUT]: { label: 'Chiqqan',        color: 'default' },
+  [BookingStatus.CANCELLED]:   { label: 'Bekor qilingan', color: 'red'     },
 }
 
 export default function CheckIn() {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [searchForm] = Form.useForm()
-  const [bookingForm] = Form.useForm()
   const [foundBooking, setFoundBooking] = useState<Booking | null>(null)
-  const [isNewBooking, setIsNewBooking] = useState(false)
+  const [searching, setSearching] = useState(false)
 
-  // Mock booking for demo
-  const mockBooking: Booking = {
-    id: '1', bookingNumber: 'BK-2024-001', guestId: '1',
-    guest: { id: '1', firstName: 'Alisher', lastName: 'Karimov', passportNumber: 'AA1234567', phone: '+998901234567', email: 'alisher@example.com', createdAt: '', updatedAt: '' },
-    roomId: '1',
-    room: { id: '1', roomNumber: '101', type: RoomType.STANDARD, capacity: 2, pricePerNight: 350000, status: 'AVAILABLE' as never, createdAt: '', updatedAt: '' },
-    checkInDate: dayjs().format('YYYY-MM-DD'),
-    checkOutDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
-    guestsCount: 2, status: BookingStatus.CONFIRMED,
-    totalAmount: 1050000, createdAt: '', updatedAt: '',
+  // Bron qidirish — booking_number yoki ID bo'yicha
+  const handleSearch = async (values: { query: string }) => {
+    setSearching(true)
+    try {
+      const query = values.query.trim()
+      let booking: Booking | null = null
+
+      // BK- bilan boshlansa — booking_number, aks holda ID
+      if (query.toUpperCase().startsWith('BK-')) {
+        const res = await axiosInstance.get('/bookings/', {
+          params: { booking_number: query.toUpperCase() },
+        })
+        const list = res.data.results || (Array.isArray(res.data) ? res.data : [])
+        if (list.length > 0) {
+          // normalize qilish
+          const b = list[0]
+          booking = {
+            id:             String(b.id),
+            bookingNumber:  b.booking_number,
+            guestId:        String(b.customer),
+            guest: b.customer_name ? {
+              id:             String(b.customer),
+              firstName:      b.customer_name.split(' ')[0] || '',
+              lastName:       b.customer_name.split(' ').slice(1).join(' ') || '',
+              passportNumber: '',
+              phone:          '',
+              email:          '',
+              createdAt:      '',
+              updatedAt:      '',
+            } : undefined,
+            roomId:         String(b.room),
+            room: b.room_number ? {
+              id:            String(b.room),
+              roomNumber:    b.room_number,
+              type:          b.room_type as never,
+              capacity:      2,
+              pricePerNight: 0,
+              status:        'available' as never,
+              createdAt:     '',
+              updatedAt:     '',
+            } : undefined,
+            checkInDate:    b.check_in,
+            checkOutDate:   b.check_out,
+            guestsCount:    b.guests_count,
+            status:         b.status as BookingStatus,
+            totalAmount:    Number(b.total_amount),
+            discountAmount: Number(b.discount_amount || 0),
+            notes:          b.notes || '',
+            createdAt:      b.created_at,
+            updatedAt:      b.updated_at,
+          }
+        }
+      } else {
+        // ID bo'yicha qidirish
+        const res = await axiosInstance.get(`/bookings/${query}/`)
+        const b = res.data
+        booking = {
+          id:             String(b.id),
+          bookingNumber:  b.booking_number,
+          guestId:        String(b.customer),
+          guest: b.customer_name ? {
+            id:             String(b.customer),
+            firstName:      b.customer_name.split(' ')[0] || '',
+            lastName:       b.customer_name.split(' ').slice(1).join(' ') || '',
+            passportNumber: '',
+            phone:          '',
+            email:          '',
+            createdAt:      '',
+            updatedAt:      '',
+          } : undefined,
+          roomId:         String(b.room),
+          room: b.room_number ? {
+            id:            String(b.room),
+            roomNumber:    b.room_number,
+            type:          b.room_type as never,
+            capacity:      2,
+            pricePerNight: 0,
+            status:        'available' as never,
+            createdAt:     '',
+            updatedAt:     '',
+          } : undefined,
+          checkInDate:    b.check_in,
+          checkOutDate:   b.check_out,
+          guestsCount:    b.guests_count,
+          status:         b.status as BookingStatus,
+          totalAmount:    Number(b.total_amount),
+          discountAmount: Number(b.discount_amount || 0),
+          notes:          b.notes || '',
+          createdAt:      b.created_at,
+          updatedAt:      b.updated_at,
+        }
+      }
+
+      if (!booking) {
+        message.error('Bron topilmadi')
+        return
+      }
+
+      if (booking.status !== BookingStatus.CONFIRMED) {
+        message.warning(
+          `Bu bron check-in uchun mos emas. Holati: "${statusConfig[booking.status]?.label}". ` +
+          `Faqat "Tasdiqlangan" bronlar uchun check-in mumkin.`
+        )
+        return
+      }
+
+      setFoundBooking(booking)
+      setStep(1)
+    } catch {
+      message.error("Bron topilmadi. Bron raqami yoki ID ni tekshiring.")
+    } finally {
+      setSearching(false)
+    }
   }
 
+  // Check-in API
   const checkInMutation = useMutation({
-    mutationFn: (data: CheckInDto) => bookingsApi.checkIn(data),
-    onSuccess: () => {
-      message.success('Check-in muvaffaqiyatli amalga oshirildi!')
+    mutationFn: () => bookingsApi.checkIn({ bookingId: foundBooking!.id }),
+    onSuccess: (updated) => {
+      message.success(`Check-in muvaffaqiyatli! Bron: ${updated.bookingNumber}`)
       navigate('/bookings')
     },
-    onError: () => {
-      // Demo mode
-      message.success('Check-in muvaffaqiyatli amalga oshirildi! (Demo)')
-      navigate('/bookings')
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } } }
+      message.error(e?.response?.data?.error || 'Check-in amalga oshmadi')
     },
   })
 
-  const handleSearch = (values: { query: string }) => {
-    // Demo: find mock booking
-    if (values.query) {
-      setFoundBooking(mockBooking)
-      setStep(1)
-    } else {
-      message.error('Bron topilmadi')
-    }
-  }
-
-  const handleCheckIn = () => {
-    if (foundBooking) {
-      checkInMutation.mutate({ bookingId: foundBooking.id })
-    }
-  }
-
   const steps = [
-    { title: 'Qidirish', icon: <SearchOutlined /> },
-    { title: 'Tasdiqlash', icon: <UserOutlined /> },
-    { title: 'Check-in', icon: <LoginOutlined /> },
+    { title: 'Qidirish',   icon: <SearchOutlined /> },
+    { title: 'Tasdiqlash', icon: <UserOutlined />    },
+    { title: 'Check-in',   icon: <LoginOutlined />   },
   ]
 
   return (
@@ -81,10 +168,11 @@ export default function CheckIn() {
 
       <Steps current={step} items={steps} style={{ marginBottom: 32 }} />
 
+      {/* QADAM 1: Qidirish */}
       {step === 0 && (
         <Card title="Bron qidirish">
           <Alert
-            message="Bron raqami yoki pasport raqami orqali qidiring"
+            message="Bron raqami (BK-XXXXXXXX) yoki bron ID raqami orqali qidiring"
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
@@ -92,105 +180,68 @@ export default function CheckIn() {
           <Form form={searchForm} layout="vertical" onFinish={handleSearch}>
             <Form.Item
               name="query"
-              label="Bron raqami yoki Pasport raqami"
-              rules={[{ required: true, message: 'Qidiruv so\'zini kiriting' }]}
+              label="Bron raqami yoki ID"
+              rules={[{ required: true, message: "Qidiruv so'zini kiriting" }]}
             >
               <Input
                 size="large"
-                placeholder="BK-2024-001 yoki AA1234567"
+                placeholder="BK-148C1621 yoki 1"
                 prefix={<SearchOutlined />}
+                allowClear
               />
             </Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />} size="large">
-                Qidirish
-              </Button>
-              <Button size="large" onClick={() => setIsNewBooking(true)}>
-                Yangi bron yaratish
-              </Button>
-            </Space>
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<SearchOutlined />}
+              size="large"
+              loading={searching}
+            >
+              Qidirish
+            </Button>
           </Form>
-
-          {isNewBooking && (
-            <Card style={{ marginTop: 24 }} title="Yangi bron">
-              <Form form={bookingForm} layout="vertical">
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item name="guestId" label="Mijoz" rules={[{ required: true }]}>
-                      <Input placeholder="Mijoz ID yoki pasport" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item name="roomType" label="Xona turi" rules={[{ required: true }]}>
-                      <Select placeholder="Turni tanlang">
-                        {Object.values(RoomType).map((t) => (
-                          <Option key={t} value={t}>{roomTypeLabels[t]}</Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item name="checkInDate" label="Kirish sanasi" rules={[{ required: true }]}>
-                      <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isBefore(dayjs(), 'day')} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item name="checkOutDate" label="Chiqish sanasi" rules={[{ required: true }]}>
-                      <DatePicker style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item name="guestsCount" label="Mehmonlar soni" rules={[{ required: true }]}>
-                      <InputNumber min={1} max={10} style={{ width: '100%' }} />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    setFoundBooking(mockBooking)
-                    setStep(1)
-                    setIsNewBooking(false)
-                  }}
-                >
-                  Bron yaratish va davom etish
-                </Button>
-              </Form>
-            </Card>
-          )}
         </Card>
       )}
 
+      {/* QADAM 2: Bron ma'lumotlari */}
       {step === 1 && foundBooking && (
         <Card
           title="Bron ma'lumotlari"
           extra={
             <Space>
-              <Button onClick={() => setStep(0)}>Orqaga</Button>
+              <Button onClick={() => { setStep(0); setFoundBooking(null) }}>Orqaga</Button>
               <Button type="primary" icon={<LoginOutlined />} onClick={() => setStep(2)}>
                 Tasdiqlash
               </Button>
             </Space>
           }
         >
-          <Descriptions bordered column={2}>
+          <Descriptions bordered column={2} size="small">
             <Descriptions.Item label="Bron raqami">
-              <strong>{foundBooking.bookingNumber}</strong>
+              <strong style={{ color: '#1677ff' }}>{foundBooking.bookingNumber}</strong>
             </Descriptions.Item>
             <Descriptions.Item label="Holat">
-              <Tag color="blue">Tasdiqlangan</Tag>
+              <Tag color={statusConfig[foundBooking.status]?.color}>
+                {statusConfig[foundBooking.status]?.label}
+              </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Mijoz">
-              {foundBooking.guest?.firstName} {foundBooking.guest?.lastName}
-            </Descriptions.Item>
-            <Descriptions.Item label="Pasport">
-              {foundBooking.guest?.passportNumber}
-            </Descriptions.Item>
-            <Descriptions.Item label="Xona">
-              {foundBooking.room?.roomNumber} ({foundBooking.room?.type})
+              {foundBooking.guest
+                ? `${foundBooking.guest.firstName} ${foundBooking.guest.lastName}`
+                : `Mijoz #${foundBooking.guestId}`}
             </Descriptions.Item>
             <Descriptions.Item label="Mehmonlar soni">
               {foundBooking.guestsCount} kishi
+            </Descriptions.Item>
+            <Descriptions.Item label="Xona">
+              {foundBooking.room
+                ? `${foundBooking.room.roomNumber} (${foundBooking.room.type})`
+                : `Xona #${foundBooking.roomId}`}
+            </Descriptions.Item>
+            <Descriptions.Item label="Jami summa">
+              <Text strong style={{ color: '#1677ff' }}>
+                {Number(foundBooking.totalAmount).toLocaleString()} so'm
+              </Text>
             </Descriptions.Item>
             <Descriptions.Item label="Kirish sanasi">
               {foundBooking.checkInDate}
@@ -198,24 +249,36 @@ export default function CheckIn() {
             <Descriptions.Item label="Chiqish sanasi">
               {foundBooking.checkOutDate}
             </Descriptions.Item>
-            <Descriptions.Item label="Jami summa" span={2}>
-              <Text strong style={{ fontSize: 18, color: '#1677ff' }}>
-                {foundBooking.totalAmount.toLocaleString()} so'm
-              </Text>
-            </Descriptions.Item>
+            {foundBooking.notes && (
+              <Descriptions.Item label="Izoh" span={2}>
+                {foundBooking.notes}
+              </Descriptions.Item>
+            )}
           </Descriptions>
         </Card>
       )}
 
+      {/* QADAM 3: Check-in tasdiqlash */}
       {step === 2 && foundBooking && (
         <Card title="Check-in tasdiqlash">
           <Alert
-            message={`Mijoz ${foundBooking.guest?.firstName} ${foundBooking.guest?.lastName} uchun check-in amalga oshirilmoqda`}
-            description={`Xona: ${foundBooking.room?.roomNumber} | Kirish vaqti: ${dayjs().format('DD.MM.YYYY HH:mm')}`}
+            message="Check-in amalga oshirilmoqda"
+            description={
+              `Mijoz: ${foundBooking.guest
+                ? `${foundBooking.guest.firstName} ${foundBooking.guest.lastName}`
+                : `#${foundBooking.guestId}`
+              } | Xona: ${foundBooking.room?.roomNumber ?? foundBooking.roomId} | ` +
+              `Bron: ${foundBooking.bookingNumber}`
+            }
             type="success"
             showIcon
             style={{ marginBottom: 24 }}
           />
+          {checkInMutation.isPending && (
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <Spin tip="Check-in amalga oshirilmoqda..." />
+            </div>
+          )}
           <Space>
             <Button onClick={() => setStep(1)}>Orqaga</Button>
             <Button
@@ -223,7 +286,7 @@ export default function CheckIn() {
               size="large"
               icon={<LoginOutlined />}
               loading={checkInMutation.isPending}
-              onClick={handleCheckIn}
+              onClick={() => checkInMutation.mutate()}
             >
               Check-in ni tasdiqlash
             </Button>

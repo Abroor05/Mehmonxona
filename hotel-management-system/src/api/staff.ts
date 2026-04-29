@@ -4,11 +4,11 @@ import { StaffRole } from '../types/enums'
 
 const normalizeStaff = (s: Record<string, unknown>): Staff => ({
   id:          String(s.id),
-  firstName:   (s.user_detail as Record<string, unknown>)?.first_name as string || '',
-  lastName:    (s.user_detail as Record<string, unknown>)?.last_name as string || '',
-  role:        (s.role || (s.user_detail as Record<string, unknown>)?.role) as StaffRole,
-  phone:       (s.user_detail as Record<string, unknown>)?.phone as string || '',
-  email:       (s.email || (s.user_detail as Record<string, unknown>)?.email) as string || '',
+  firstName:   s.first_name as string || '',
+  lastName:    s.last_name as string || '',
+  role:        s.role as StaffRole,
+  phone:       s.phone as string || '',
+  email:       s.email as string || '',
   hourlyRate:  Number(s.hourly_rate || 0),
   isActive:    Boolean(s.is_active !== false),
   createdAt:   s.created_at as string || '',

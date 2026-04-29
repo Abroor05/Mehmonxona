@@ -32,14 +32,6 @@ const roleColors: Record<StaffRole, string> = {
   [StaffRole.ACCOUNTANT]: 'purple',
 }
 
-const mockStaff: Staff[] = [
-  { id: '1', firstName: 'Sardor', lastName: 'Toshmatov', role: StaffRole.ADMIN, phone: '+998901111111', email: 'sardor@hotel.uz', hourlyRate: 50000, isActive: true, createdAt: '', updatedAt: '' },
-  { id: '2', firstName: 'Nilufar', lastName: 'Hasanova', role: StaffRole.MANAGER, phone: '+998902222222', email: 'nilufar@hotel.uz', hourlyRate: 40000, isActive: true, createdAt: '', updatedAt: '' },
-  { id: '3', firstName: 'Bobur', lastName: 'Rahimov', role: StaffRole.RECEPTIONIST, phone: '+998903333333', email: 'bobur@hotel.uz', hourlyRate: 25000, isActive: true, createdAt: '', updatedAt: '' },
-  { id: '4', firstName: 'Zulfiya', lastName: 'Mirzayeva', role: StaffRole.HOUSEKEEPER, phone: '+998904444444', email: 'zulfiya@hotel.uz', hourlyRate: 20000, isActive: true, createdAt: '', updatedAt: '' },
-  { id: '5', firstName: 'Jasur', lastName: 'Qodirov', role: StaffRole.ACCOUNTANT, phone: '+998905555555', email: 'jasur@hotel.uz', hourlyRate: 35000, isActive: false, createdAt: '', updatedAt: '' },
-]
-
 export default function StaffList() {
   const queryClient = useQueryClient()
   const [filterRole, setFilterRole] = useState<StaffRole | 'ALL'>('ALL')
@@ -78,7 +70,7 @@ export default function StaffList() {
     onError: () => message.error('Xatolik yuz berdi'),
   })
 
-  const displayData = data?.data || mockStaff
+  const displayData = data?.data ?? []
   const filteredData = filterRole !== 'ALL' ? displayData.filter((s) => s.role === filterRole) : displayData
 
   const columns: ColumnsType<Staff> = [

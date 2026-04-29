@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Table, Button, Input, Space, Typography, Modal, Form,
-  message, Tag, Tooltip, Card, Row, Col,
+  message, Tooltip, Card, Row, Col,
 } from 'antd'
 import {
   PlusOutlined, SearchOutlined, EditOutlined,
@@ -40,7 +40,16 @@ export default function GuestList() {
       setModalOpen(false)
       form.resetFields()
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: Record<string, string[]> } }
+      const errors = e?.response?.data
+      if (errors) {
+        const msg = Object.values(errors).flat().join(' | ')
+        message.error(msg)
+      } else {
+        message.error('Mijoz qo\'shishda xatolik yuz berdi')
+      }
+    },
   })
 
   const updateMutation = useMutation({
@@ -52,7 +61,16 @@ export default function GuestList() {
       setEditingGuest(null)
       form.resetFields()
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: Record<string, string[]> } }
+      const errors = e?.response?.data
+      if (errors) {
+        const msg = Object.values(errors).flat().join(' | ')
+        message.error(msg)
+      } else {
+        message.error('Yangilashda xatolik yuz berdi')
+      }
+    },
   })
 
   const deleteMutation = useMutation({
@@ -61,7 +79,7 @@ export default function GuestList() {
       message.success('Mijoz o\'chirildi')
       queryClient.invalidateQueries({ queryKey: ['guests'] })
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error('O\'chirishda xatolik yuz berdi'),
   })
 
   const handleSubmit = (values: CreateGuestDto) => {
@@ -89,14 +107,7 @@ export default function GuestList() {
     })
   }
 
-  // Mock data for demo
-  const mockGuests: Guest[] = [
-    { id: '1', firstName: 'Alisher', lastName: 'Karimov', passportNumber: 'AA1234567', phone: '+998901234567', email: 'alisher@example.com', createdAt: '2024-01-15', updatedAt: '2024-01-15' },
-    { id: '2', firstName: 'Malika', lastName: 'Yusupova', passportNumber: 'BB7654321', phone: '+998907654321', email: 'malika@example.com', nationality: 'O\'zbek', createdAt: '2024-01-16', updatedAt: '2024-01-16' },
-    { id: '3', firstName: 'John', lastName: 'Smith', passportNumber: 'US9876543', phone: '+12025551234', email: 'john@example.com', nationality: 'Amerika', createdAt: '2024-01-17', updatedAt: '2024-01-17' },
-  ]
-
-  const displayData = data?.data || mockGuests
+  const displayData = data?.data ?? []
 
   const columns: ColumnsType<Guest> = [
     {
@@ -116,11 +127,6 @@ export default function GuestList() {
       ),
     },
     {
-      title: 'Pasport',
-      dataIndex: 'passportNumber',
-      key: 'passportNumber',
-    },
-    {
       title: 'Telefon',
       dataIndex: 'phone',
       key: 'phone',
@@ -129,12 +135,6 @@ export default function GuestList() {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-    },
-    {
-      title: 'Millat',
-      dataIndex: 'nationality',
-      key: 'nationality',
-      render: (val) => val ? <Tag color="blue">{val}</Tag> : <Tag>Noma\'lum</Tag>,
     },
     {
       title: 'Amallar',
@@ -231,16 +231,6 @@ export default function GuestList() {
             </Col>
           </Row>
           <Form.Item
-            name="passportNumber"
-            label="Pasport raqami"
-            rules={[
-              { required: true, message: 'Pasport raqamini kiriting' },
-              { pattern: /^[A-Z]{2}\d{7}$/, message: 'Format: AA1234567' },
-            ]}
-          >
-            <Input placeholder="AA1234567" />
-          </Form.Item>
-          <Form.Item
             name="phone"
             label="Telefon raqami"
             rules={[
@@ -259,9 +249,6 @@ export default function GuestList() {
             ]}
           >
             <Input placeholder="email@example.com" />
-          </Form.Item>
-          <Form.Item name="nationality" label="Millat">
-            <Input placeholder="O'zbek" />
           </Form.Item>
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>

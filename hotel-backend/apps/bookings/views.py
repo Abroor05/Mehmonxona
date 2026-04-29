@@ -43,6 +43,8 @@ class BookingListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(status=s)
         if room_id := self.request.query_params.get('room'):
             qs = qs.filter(room_id=room_id)
+        if booking_number := self.request.query_params.get('booking_number'):
+            qs = qs.filter(booking_number__iexact=booking_number)
 
         return qs
 

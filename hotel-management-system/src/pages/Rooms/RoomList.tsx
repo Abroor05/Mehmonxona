@@ -36,17 +36,6 @@ const statusConfig: Record<RoomStatus, { label: string; color: string; icon: Rea
   [RoomStatus.MAINTENANCE]: { label: "Ta'mirda", color: '#8c8c8c', icon: <ToolOutlined /> },
 }
 
-const mockRooms: Room[] = [
-  { id: '1', roomNumber: '101', type: RoomType.STANDARD, capacity: 2, pricePerNight: 350000, status: RoomStatus.AVAILABLE, createdAt: '', updatedAt: '' },
-  { id: '2', roomNumber: '102', type: RoomType.STANDARD, capacity: 2, pricePerNight: 350000, status: RoomStatus.OCCUPIED, createdAt: '', updatedAt: '' },
-  { id: '3', roomNumber: '201', type: RoomType.LUX, capacity: 3, pricePerNight: 650000, status: RoomStatus.AVAILABLE, createdAt: '', updatedAt: '' },
-  { id: '4', roomNumber: '202', type: RoomType.LUX, capacity: 3, pricePerNight: 650000, status: RoomStatus.CLEANING, createdAt: '', updatedAt: '' },
-  { id: '5', roomNumber: '301', type: RoomType.VIP, capacity: 4, pricePerNight: 1200000, status: RoomStatus.AVAILABLE, createdAt: '', updatedAt: '' },
-  { id: '6', roomNumber: '302', type: RoomType.VIP, capacity: 4, pricePerNight: 1200000, status: RoomStatus.MAINTENANCE, createdAt: '', updatedAt: '' },
-  { id: '7', roomNumber: '103', type: RoomType.STANDARD, capacity: 2, pricePerNight: 350000, status: RoomStatus.OCCUPIED, createdAt: '', updatedAt: '' },
-  { id: '8', roomNumber: '104', type: RoomType.STANDARD, capacity: 2, pricePerNight: 350000, status: RoomStatus.AVAILABLE, createdAt: '', updatedAt: '' },
-]
-
 export default function RoomList() {
   const queryClient = useQueryClient()
   const { hasRole } = useAuthStore()
@@ -90,7 +79,7 @@ export default function RoomList() {
     onError: () => message.error('Xatolik yuz berdi'),
   })
 
-  const displayRooms = data?.data || mockRooms
+  const displayRooms = data?.data ?? []
   const filteredRooms = displayRooms.filter((room) => {
     if (filterType !== 'ALL' && room.type !== filterType) return false
     if (filterStatus !== 'ALL' && room.status !== filterStatus) return false

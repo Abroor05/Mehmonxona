@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Table, Card, Typography, Tag, Select, Space, Row, Col,
-  DatePicker, Statistic, Button, Modal, Form, Input, InputNumber, message,
+  DatePicker, Statistic, Button, Modal, Form, InputNumber, message,
 } from 'antd'
 import { DollarOutlined, FileTextOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { paymentsApi } from '../../api/payments'
+import { bookingsApi } from '../../api/bookings'
 import { Payment } from '../../types'
-import { PaymentMethod, PaymentStatus } from '../../types/enums'
+import { PaymentMethod, PaymentStatus, BookingStatus } from '../../types/enums'
 import { useAuthStore } from '../../store/authStore'
 import { StaffRole } from '../../types/enums'
 
@@ -42,20 +43,12 @@ const statusColors: Record<PaymentStatus, string> = {
   [PaymentStatus.REFUNDED]: 'default',
 }
 
-// Demo to'lovlar
-const mockPayments: Payment[] = [
-  { id: '1', transactionNumber: 'TXN-001', bookingId: 'BK-2024-001', amount: 1050000, method: PaymentMethod.CASH, status: PaymentStatus.COMPLETED, processedBy: 'Admin', processedAt: '2024-04-20 10:30' },
-  { id: '2', transactionNumber: 'TXN-002', bookingId: 'BK-2024-002', amount: 2320000, method: PaymentMethod.CARD, status: PaymentStatus.COMPLETED, processedBy: 'Menejer', processedAt: '2024-04-22 14:15' },
-  { id: '3', transactionNumber: 'TXN-003', bookingId: 'BK-2024-003', amount: 3600000, method: PaymentMethod.ONLINE, status: PaymentStatus.PENDING, processedBy: 'Admin', processedAt: '2024-04-23 09:00' },
-]
-
 export default function PaymentList() {
   const queryClient = useQueryClient()
-  const { user, hasRole } = useAuthStore()
+  const { hasRole } = useAuthStore()
   const [filterMethod, setFilterMethod] = useState<PaymentMethod | 'ALL'>('ALL')
   const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
-  const [localPayments, setLocalPayments] = useState<Payment[]>(mockPayments)
   const [form] = Form.useForm()
 
   const { data, isLoading } = useQuery({
@@ -68,6 +61,16 @@ export default function PaymentList() {
     retry: false,
   })
 
+  // Bronlar ro'yxati — to'lov qo'shish uchun
+  const { data: bookingsData } = useQuery({
+    queryKey: ['bookings-for-payment'],
+    queryFn: () => bookingsApi.getAll({
+      status: BookingStatus.CHECKED_IN,
+    }),
+    enabled: modalOpen,
+    retry: false,
+  })
+
   const createMutation = useMutation({
     mutationFn: (values: { bookingId: string; amount: number; method: PaymentMethod; discountCode?: string }) =>
       paymentsApi.processPayment(values),
@@ -77,27 +80,14 @@ export default function PaymentList() {
       setModalOpen(false)
       form.resetFields()
     },
-    onError: () => {
-      // Demo rejim — API yo'q bo'lsa ham ishlaydi
-      const values = form.getFieldsValue()
-      const newPayment: Payment = {
-        id: String(Date.now()),
-        transactionNumber: `TXN-${String(Date.now()).slice(-4)}`,
-        bookingId: values.bookingId || 'BK-DEMO',
-        amount: values.amount || 0,
-        method: values.method,
-        status: PaymentStatus.COMPLETED,
-        processedBy: user?.firstName || 'Xodim',
-        processedAt: new Date().toLocaleString('uz-UZ'),
-      }
-      setLocalPayments((prev) => [newPayment, ...prev])
-      message.success("To'lov muvaffaqiyatli amalga oshirildi! (Demo)")
-      setModalOpen(false)
-      form.resetFields()
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { detail?: string } } }
+      const msg = e?.response?.data?.detail || "To'lovda xatolik yuz berdi"
+      message.error(msg)
     },
   })
 
-  const displayData = data?.data || localPayments
+  const displayData = data?.data ?? []
   const filteredData = filterMethod !== 'ALL'
     ? displayData.filter((p) => p.method === filterMethod)
     : displayData
@@ -259,10 +249,25 @@ export default function PaymentList() {
         >
           <Form.Item
             name="bookingId"
-            label="Bron raqami"
-            rules={[{ required: true, message: 'Bron raqamini kiriting' }]}
+            label="Bron tanlash (Kirgan bronlar)"
+            rules={[{ required: true, message: 'Bronni tanlang' }]}
           >
-            <Input placeholder="BK-2024-001" prefix={<FileTextOutlined />} />
+            <Select
+              placeholder="Bronni tanlang"
+              showSearch
+              optionFilterProp="children"
+              size="large"
+            >
+              {(bookingsData?.data ?? []).map((b) => (
+                <Option key={b.id} value={b.id}>
+                  {b.bookingNumber} —{' '}
+                  {b.guest
+                    ? `${b.guest.firstName} ${b.guest.lastName}`
+                    : `Mijoz #${b.guestId}`}{' '}
+                  | {Number(b.totalAmount).toLocaleString()} so'm
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item
@@ -289,10 +294,6 @@ export default function PaymentList() {
                 <Option key={m} value={m}>{methodLabels[m]}</Option>
               ))}
             </Select>
-          </Form.Item>
-
-          <Form.Item name="discountCode" label="Chegirma kodi (ixtiyoriy)">
-            <Input placeholder="DISCOUNT10" />
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>

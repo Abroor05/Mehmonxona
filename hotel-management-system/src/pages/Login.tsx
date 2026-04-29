@@ -8,47 +8,48 @@ import { LoginDto } from '../types'
 
 const { Title, Text } = Typography
 
+// Barcha foydalanuvchilar — Django da yaratilgan
+const QUICK_USERS = [
+  { label: '👑 Admin',        username: 'admin1',        password: 'Admin1234!',   color: 'red'    },
+  { label: '📊 Menejer',      username: 'manager1',      password: 'Manager123!',  color: 'orange' },
+  { label: '🏨 Resepsionist', username: 'receptionist1', password: 'Recept123!',   color: 'blue'   },
+  { label: '🧹 Tozalovchi',   username: 'housekeeper1',  password: 'House1234!',   color: 'green'  },
+  { label: '💰 Hisobchi',     username: 'accountant1',   password: 'Account123!',  color: 'purple' },
+]
+
 export default function Login() {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
   const { login } = useAuthStore()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [form] = Form.useForm()
+  const [error,   setError]   = useState<string | null>(null)
+  const [form]                = Form.useForm()
 
   const handleSubmit = async (values: LoginDto) => {
     setLoading(true)
     setError(null)
-
     try {
-      // Real API call to Django backend
       const response = await authApi.login(values)
       login(response.user, response.accessToken, response.refreshToken)
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
-      const axiosError = err as {
-        response?: { status?: number; data?: { detail?: string; non_field_errors?: string[] } }
-      }
-
-      if (axiosError.response?.status === 401) {
-        setError("Foydalanuvchi nomi yoki parol noto'g'ri")
-      } else if (axiosError.response?.status === 400) {
-        const detail = axiosError.response.data?.non_field_errors?.[0]
-          || axiosError.response.data?.detail
-          || "Ma'lumotlar noto'g'ri"
-        setError(detail)
-      } else if (!axiosError.response) {
-        // Network error — backend ishlamayapti
-        setError('Backend serverga ulanib bo\'lmadi. Django server ishga tushganligini tekshiring (localhost:8000)')
+      const e = err as { response?: { status?: number; data?: { detail?: string; non_field_errors?: string[] } } }
+      if (!e.response) {
+        setError('Django server ishlamayapti. Terminalda "python manage.py runserver" ni ishga tushiring.')
+      } else if (e.response.status === 401) {
+        setError("Login yoki parol noto'g'ri")
       } else {
-        setError('Tizimga kirishda xatolik yuz berdi')
+        const msg = e.response.data?.non_field_errors?.[0] || e.response.data?.detail || 'Xatolik yuz berdi'
+        setError(msg)
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const fillDemo = (username: string, password: string) => {
+  const quickLogin = (username: string, password: string) => {
     form.setFieldsValue({ username, password })
+    // Avtomatik submit
+    form.submit()
   }
 
   return (
@@ -61,17 +62,18 @@ export default function Login() {
       padding: '24px',
     }}>
       <Card
-        style={{ width: '100%', maxWidth: 440, borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
-        styles={{ body: { padding: '40px' } }}
+        style={{ width: '100%', maxWidth: 460, borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+        styles={{ body: { padding: '36px' } }}
       >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+
           {/* Logo */}
           <div style={{ textAlign: 'center' }}>
             <div style={{
               width: 64, height: 64, borderRadius: '50%',
               background: 'linear-gradient(135deg, #1677ff, #0958d9)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px',
+              margin: '0 auto 12px',
             }}>
               <BankOutlined style={{ fontSize: 32, color: '#fff' }} />
             </div>
@@ -79,32 +81,49 @@ export default function Login() {
             <Text type="secondary">Boshqaruv paneliga kirish</Text>
           </div>
 
-          {/* Tezkor kirish */}
+          {/* Tezkor kirish tugmalari */}
           <div style={{
-            background: '#f6ffed', border: '1px solid #b7eb8f',
-            borderRadius: 8, padding: '12px 16px',
+            background: '#f0f5ff',
+            border: '1px solid #adc6ff',
+            borderRadius: 10,
+            padding: '14px 16px',
           }}>
-            <Text strong style={{ fontSize: 13, color: '#389e0d' }}>
-              Tezkor kirish (Django admin):
+            <Text strong style={{ fontSize: 13, color: '#2f54eb', display: 'block', marginBottom: 10 }}>
+              ⚡ Tezkor kirish — bosing va kiring:
             </Text>
-            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Tag color="red" style={{ cursor: 'pointer', padding: '4px 10px' }}
-                onClick={() => fillDemo('admin', 'Admin1234!')}>
-                👑 Admin
-              </Tag>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {QUICK_USERS.map((u) => (
+                <Tag
+                  key={u.username}
+                  color={u.color}
+                  style={{ cursor: 'pointer', padding: '5px 12px', fontSize: 13, borderRadius: 6 }}
+                  onClick={() => quickLogin(u.username, u.password)}
+                >
+                  {u.label}
+                </Tag>
+              ))}
             </div>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
-              Django server: http://localhost:8000 ishga tushgan bo'lishi kerak
-            </Text>
           </div>
 
-          {/* Xato */}
+          {/* Xato xabari */}
           {error && (
-            <Alert message={error} type="error" showIcon closable onClose={() => setError(null)} />
+            <Alert
+              message={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+            />
           )}
 
-          {/* Forma */}
-          <Form form={form} layout="vertical" onFinish={handleSubmit} autoComplete="off" size="large">
+          {/* Login formasi */}
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+            autoComplete="off"
+            size="large"
+          >
             <Form.Item
               name="username"
               label="Foydalanuvchi nomi"
@@ -118,24 +137,31 @@ export default function Login() {
               label="Parol"
               rules={[{ required: true, message: 'Parolni kiriting' }]}
             >
-              <Input.Password prefix={<LockOutlined />} placeholder="Admin1234!" />
+              <Input.Password prefix={<LockOutlined />} placeholder="••••••••" />
             </Form.Item>
 
             <Form.Item style={{ marginBottom: 0 }}>
               <Button
-                type="primary" htmlType="submit" loading={loading} block
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                block
                 style={{ height: 48, fontSize: 16, borderRadius: 8 }}
               >
-                Kirish
+                {loading ? 'Kirilmoqda...' : 'Kirish'}
               </Button>
             </Form.Item>
           </Form>
 
-          <Divider style={{ margin: 0 }}>
+          <Divider style={{ margin: '4px 0' }} />
+
+          {/* Parollar jadvali */}
+          <div style={{ background: '#fafafa', borderRadius: 8, padding: '10px 14px' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              admin / Admin1234!
+              <b>Parollar:</b> admin1→Admin1234! | manager1→Manager123! | receptionist1→Recept123!
             </Text>
-          </Divider>
+          </div>
+
         </Space>
       </Card>
     </div>

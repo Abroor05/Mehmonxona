@@ -10,9 +10,14 @@ class ScheduleSerializer(serializers.ModelSerializer):
 
 
 class StaffProfileSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
-    role      = serializers.CharField(source='user.role', read_only=True)
-    email     = serializers.CharField(source='user.email', read_only=True)
+    # Frontend normalize() funksiyasi uchun kerakli fieldlar
+    full_name  = serializers.SerializerMethodField()
+    role       = serializers.CharField(source='user.role',       read_only=True)
+    email      = serializers.CharField(source='user.email',      read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name  = serializers.CharField(source='user.last_name',  read_only=True)
+    phone      = serializers.CharField(source='user.phone',      read_only=True)
+    username   = serializers.CharField(source='user.username',   read_only=True)
 
     class Meta:
         model  = StaffProfile

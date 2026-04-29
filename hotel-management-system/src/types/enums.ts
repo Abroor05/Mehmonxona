@@ -1,43 +1,43 @@
 export enum RoomType {
-  STANDARD = 'STANDARD',
-  LUX = 'LUX',
-  VIP = 'VIP',
+  STANDARD = 'standard',
+  LUX = 'deluxe',
+  VIP = 'vip',
 }
 
 export enum RoomStatus {
-  AVAILABLE = 'AVAILABLE',       // Bo'sh
-  OCCUPIED = 'OCCUPIED',         // Band
-  CLEANING = 'CLEANING',         // Tozalanmoqda
-  MAINTENANCE = 'MAINTENANCE',   // Ta'mirda
+  AVAILABLE   = 'available',     // Bo'sh
+  OCCUPIED    = 'booked',        // Band
+  CLEANING    = 'cleaning',      // Tozalanmoqda
+  MAINTENANCE = 'maintenance',   // Ta'mirda
 }
 
 export enum BookingStatus {
-  PENDING = 'PENDING',           // Kutilmoqda
-  CONFIRMED = 'CONFIRMED',       // Tasdiqlangan
-  CHECKED_IN = 'CHECKED_IN',     // Kirgan
-  CHECKED_OUT = 'CHECKED_OUT',   // Chiqqan
-  CANCELLED = 'CANCELLED',       // Bekor qilingan
+  PENDING     = 'pending',       // Kutilmoqda
+  CONFIRMED   = 'confirmed',     // Tasdiqlangan
+  CHECKED_IN  = 'checked_in',    // Kirgan
+  CHECKED_OUT = 'checked_out',   // Chiqqan
+  CANCELLED   = 'cancelled',     // Bekor qilingan
 }
 
 export enum PaymentMethod {
-  CASH = 'CASH',                 // Naqd
-  CARD = 'CARD',                 // Karta
-  ONLINE = 'ONLINE',             // Onlayn
+  CASH   = 'cash',               // Naqd
+  CARD   = 'card',               // Karta
+  ONLINE = 'online',             // Onlayn
 }
 
 export enum PaymentStatus {
-  PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  REFUNDED = 'REFUNDED',
+  PENDING   = 'pending',
+  COMPLETED = 'completed',
+  FAILED    = 'failed',
+  REFUNDED  = 'refunded',
 }
 
 export enum StaffRole {
-  ADMIN = 'ADMIN',               // Administrator
-  MANAGER = 'MANAGER',           // Menejer
-  RECEPTIONIST = 'RECEPTIONIST', // Resepsionist
-  HOUSEKEEPER = 'HOUSEKEEPER',   // Tozalovchi
-  ACCOUNTANT = 'ACCOUNTANT',     // Hisobchi
+  ADMIN        = 'admin',        // Administrator
+  MANAGER      = 'manager',      // Menejer
+  RECEPTIONIST = 'receptionist', // Resepsionist
+  HOUSEKEEPER  = 'housekeeper',  // Tozalovchi
+  ACCOUNTANT   = 'accountant',   // Hisobchi
 }
 
 export enum ServiceType {

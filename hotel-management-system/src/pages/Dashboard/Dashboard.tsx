@@ -15,7 +15,7 @@ import { reportsApi } from '../../api/reports'
 
 const { Title } = Typography
 
-const COLORS = ['#1677ff', '#52c41a', '#faad14', '#ff4d4f']
+const COLORS = ['#52c41a', '#ff4d4f', '#faad14', '#8c8c8c']
 
 const mockWeeklyRevenue = [
   { date: 'Dush', revenue: 1200000 },
@@ -27,36 +27,60 @@ const mockWeeklyRevenue = [
   { date: 'Yak', revenue: 2600000 },
 ]
 
-const mockRoomStatus = [
-  { name: "Bo'sh", value: 12 },
-  { name: 'Band', value: 28 },
-  { name: 'Tozalanmoqda', value: 5 },
-  { name: "Ta'mirda", value: 3 },
-]
-
 export default function Dashboard() {
   const { data: stats, isLoading, error } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: reportsApi.getDashboardStats,
     retry: false,
+    staleTime: 30000,
   })
 
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-        <Spin size="large" />
-      </div>
-    )
+  const { data: occupancy } = useQuery({
+    queryKey: ['occupancy-report'],
+    queryFn: () => reportsApi.getOccupancy({ period: 'MONTHLY' as never }),
+    retry: false,
+    staleTime: 30000,
+  })
+
+  const displayStats = stats || {
+    totalRooms: 0,
+    occupiedRooms: 0,
+    todayCheckIns: 0,
+    todayCheckOuts: 0,
+    todayRevenue: 0,
+    pendingServices: 0,
   }
 
-  // Use mock data if API not available
-  const displayStats = stats || {
-    totalRooms: 48,
-    occupiedRooms: 28,
-    todayCheckIns: 8,
-    todayCheckOuts: 5,
-    todayRevenue: 4800000,
-    pendingServices: 3,
+  // Real room status pie data from occupancy report
+  const roomStatusData = occupancy?.byType?.length
+    ? occupancy.byType.map((t) => ({
+        name: t.type === 'standard' ? 'Standard' : t.type === 'deluxe' ? 'Deluxe' : 'VIP',
+        value: t.total,
+      }))
+    : [
+        { name: "Bo'sh", value: displayStats.totalRooms - displayStats.occupiedRooms },
+        { name: 'Band', value: displayStats.occupiedRooms },
+      ]
+
+  // Real room type bar data
+  const roomTypeBarData = occupancy?.byType?.length
+    ? occupancy.byType.map((t) => ({
+        type: t.type === 'standard' ? 'Standard' : t.type === 'deluxe' ? 'Deluxe' : 'VIP',
+        total: t.total,
+        occupied: t.occupied,
+      }))
+    : [
+        { type: 'Standard', total: 0, occupied: 0 },
+        { type: 'Deluxe', total: 0, occupied: 0 },
+        { type: 'VIP', total: 0, occupied: 0 },
+      ]
+
+  if (isLoading && !error) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+        <Spin size="large" tip="Yuklanmoqda..." />
+      </div>
+    )
   }
 
   return (
@@ -65,7 +89,8 @@ export default function Dashboard() {
 
       {error && (
         <Alert
-          message="API ulanmagan — demo ma'lumotlar ko'rsatilmoqda"
+          message="Backend server bilan ulanishda xatolik"
+          description="Django server ishlamayapti. Terminalda 'python manage.py runserver' ni ishga tushiring."
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
@@ -175,13 +200,13 @@ export default function Dashboard() {
           </Card>
         </Col>
 
-        {/* Xonalar holati */}
+        {/* Xonalar holati — real data */}
         <Col xs={24} lg={8}>
           <Card title="Xonalar holati">
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
-                  data={mockRoomStatus}
+                  data={roomStatusData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -190,7 +215,7 @@ export default function Dashboard() {
                   dataKey="value"
                   label={({ name, value }) => `${name}: ${value}`}
                 >
-                  {mockRoomStatus.map((_, index) => (
+                  {roomStatusData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -201,15 +226,11 @@ export default function Dashboard() {
           </Card>
         </Col>
 
-        {/* Xona turlari bo'yicha band */}
+        {/* Xona turlari bo'yicha band — real data */}
         <Col xs={24}>
           <Card title="Xona turlari bo'yicha bandlik">
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={[
-                { type: 'Standard', total: 30, occupied: 18 },
-                { type: 'Lux', total: 12, occupied: 8 },
-                { type: 'VIP', total: 6, occupied: 2 },
-              ]}>
+              <BarChart data={roomTypeBarData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="type" />
                 <YAxis />
