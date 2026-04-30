@@ -17,16 +17,6 @@ const { Title } = Typography
 
 const COLORS = ['#52c41a', '#ff4d4f', '#faad14', '#8c8c8c']
 
-const mockWeeklyRevenue = [
-  { date: 'Dush', revenue: 1200000 },
-  { date: 'Sesh', revenue: 1800000 },
-  { date: 'Chor', revenue: 1500000 },
-  { date: 'Pay', revenue: 2200000 },
-  { date: 'Jum', revenue: 2800000 },
-  { date: 'Shan', revenue: 3200000 },
-  { date: 'Yak', revenue: 2600000 },
-]
-
 export default function Dashboard() {
   const { data: stats, isLoading, error } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -42,14 +32,24 @@ export default function Dashboard() {
     staleTime: 30000,
   })
 
+  const { data: revenueData } = useQuery({
+    queryKey: ['revenue-report', 'MONTHLY'],
+    queryFn: () => reportsApi.getRevenue({ period: 'MONTHLY' as never }),
+    retry: false,
+    staleTime: 30000,
+  })
+
   const displayStats = stats || {
-    totalRooms: 0,
-    occupiedRooms: 0,
-    todayCheckIns: 0,
-    todayCheckOuts: 0,
-    todayRevenue: 0,
+    totalRooms:      0,
+    occupiedRooms:   0,
+    todayCheckIns:   0,
+    todayCheckOuts:  0,
+    todayRevenue:    0,
     pendingServices: 0,
   }
+
+  // Real revenue chart data from backend
+  const weeklyRevenueData = revenueData?.data ?? []
 
   // Real room status pie data from occupancy report
   const roomStatusData = occupancy?.byType?.length
@@ -177,26 +177,32 @@ export default function Dashboard() {
 
       {/* Grafiklar */}
       <Row gutter={[16, 16]}>
-        {/* Haftalik daromad */}
+        {/* Daromad grafigi — real data */}
         <Col xs={24} lg={16}>
-          <Card title="Haftalik daromad (so'm)">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={mockWeeklyRevenue}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
-                <Tooltip formatter={(v: number) => [`${v.toLocaleString()} so'm`, 'Daromad']} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#1677ff"
-                  strokeWidth={2}
-                  dot={{ fill: '#1677ff' }}
-                  name="Daromad"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <Card title="Daromad (so'm)">
+            {weeklyRevenueData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={weeklyRevenueData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                  <Tooltip formatter={(v: number) => [`${v.toLocaleString()} so'm`, 'Daromad']} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#1677ff"
+                    strokeWidth={2}
+                    dot={{ fill: '#1677ff' }}
+                    name="Daromad"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                Hozircha to'lov ma'lumotlari yo'q
+              </div>
+            )}
           </Card>
         </Col>
 

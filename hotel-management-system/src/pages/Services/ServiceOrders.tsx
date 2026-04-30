@@ -33,24 +33,6 @@ const statusConfig: Record<ServiceOrderStatus, { label: string; color: string }>
   [ServiceOrderStatus.CANCELLED]: { label: 'Bekor qilingan', color: 'red' },
 }
 
-const mockOrders: ServiceOrder[] = [
-  {
-    id: '1', orderNumber: 'SVC-001', bookingId: '1', serviceType: ServiceType.ROOM_CLEANING,
-    status: ServiceOrderStatus.PENDING, scheduledAt: dayjs().add(1, 'hour').toISOString(),
-    price: 50000, createdAt: dayjs().toISOString(),
-  },
-  {
-    id: '2', orderNumber: 'SVC-002', bookingId: '2', serviceType: ServiceType.SPA,
-    status: ServiceOrderStatus.ASSIGNED, scheduledAt: dayjs().add(2, 'hour').toISOString(),
-    price: 300000, createdAt: dayjs().toISOString(),
-  },
-  {
-    id: '3', orderNumber: 'SVC-003', bookingId: '1', serviceType: ServiceType.LAUNDRY,
-    status: ServiceOrderStatus.COMPLETED, scheduledAt: dayjs().subtract(1, 'hour').toISOString(),
-    completedAt: dayjs().toISOString(), price: 80000, createdAt: dayjs().toISOString(),
-  },
-]
-
 export default function ServiceOrders() {
   const queryClient = useQueryClient()
   const [filterStatus, setFilterStatus] = useState<ServiceOrderStatus | 'ALL'>('ALL')
@@ -85,7 +67,7 @@ export default function ServiceOrders() {
     onError: () => message.error('Xatolik yuz berdi'),
   })
 
-  const displayData = data?.data || mockOrders
+  const displayData = data?.data ?? []
   const filteredData = filterStatus !== 'ALL'
     ? displayData.filter((o) => o.status === filterStatus)
     : displayData

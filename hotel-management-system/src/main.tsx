@@ -14,12 +14,9 @@ dayjs.locale('uz')
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // FIX: retry 0 — xato bo'lsa qayta urinmasin, demo data ko'rsatilsin
       retry: 0,
       staleTime: 5 * 60 * 1000,
-      // FIX: window focus da qayta yuklamasin
       refetchOnWindowFocus: false,
-      // FIX: xato bo'lsa ham throw qilmasin
       throwOnError: false,
     },
   },
