@@ -49,11 +49,10 @@ class BookingListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        # FIX: Pass request context so serializer can set customer
         serializer.save()
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

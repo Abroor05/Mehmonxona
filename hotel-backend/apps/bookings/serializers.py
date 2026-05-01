@@ -7,7 +7,6 @@ Fixes:
 3. Added nested room/customer info for GET responses
 """
 
-from django.utils import timezone
 from rest_framework import serializers
 from .models import Booking
 
@@ -51,12 +50,7 @@ class BookingSerializer(serializers.ModelSerializer):
         if check_in and check_out:
             if check_in >= check_out:
                 raise serializers.ValidationError({
-                    'check_out': 'check_out must be after check_in.'
-                })
-            # Allow today's check-in
-            if check_in < timezone.now().date():
-                raise serializers.ValidationError({
-                    'check_in': 'check_in cannot be in the past.'
+                    'check_out': 'Chiqish sanasi kirish sanasidan keyin bo\'lishi kerak.'
                 })
 
         # Double-booking prevention
@@ -71,7 +65,7 @@ class BookingSerializer(serializers.ModelSerializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError({
-                    'room': 'This room is already booked for the selected dates.'
+                    'room': 'Bu xona tanlangan sanalar uchun allaqachon band.'
                 })
         return attrs
 

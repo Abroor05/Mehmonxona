@@ -46,9 +46,10 @@ export const staffApi = {
   },
 
   create: async (data: CreateStaffDto): Promise<Staff> => {
-    // First create user, then staff profile
+    // 1. User yaratish
+    const username = data.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_') + '_' + Date.now()
     const userResponse = await axiosInstance.post('/auth/users/', {
-      username:   data.email.split('@')[0] + '_' + Date.now(),
+      username,
       email:      data.email,
       first_name: data.firstName,
       last_name:  data.lastName,
@@ -57,6 +58,8 @@ export const staffApi = {
       password:   data.password,
     })
     const userId = userResponse.data.id
+
+    // 2. Staff profil yaratish
     const staffResponse = await axiosInstance.post('/staff/', {
       user:        userId,
       hourly_rate: data.hourlyRate,

@@ -38,6 +38,7 @@ export interface Room {
   status: RoomStatus
   description?: string
   amenities?: string[]
+  floor?: number
   createdAt: string
   updatedAt: string
 }
@@ -49,6 +50,7 @@ export interface CreateRoomDto {
   pricePerNight: number
   description?: string
   amenities?: string[]
+  floor?: number
 }
 
 export interface UpdateRoomDto extends Partial<CreateRoomDto> {

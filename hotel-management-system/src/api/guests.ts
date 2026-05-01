@@ -57,13 +57,15 @@ export const guestsApi = {
   },
 
   create: async (data: CreateGuestDto): Promise<Guest> => {
+    // username = email dan oldin + timestamp (unique bo'lishi uchun)
+    const username = data.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_') + '_' + Date.now()
     const response = await axiosInstance.post('/auth/users/', {
+      username,
       first_name: data.firstName,
       last_name:  data.lastName,
       phone:      data.phone,
       email:      data.email,
       role:       'customer',
-      username:   data.email.split('@')[0] + '_' + Date.now(),
       password:   'TempPass123!',
     })
     return normalize(response.data)

@@ -53,12 +53,21 @@ export default function StaffList() {
   const createMutation = useMutation({
     mutationFn: (data: CreateStaffDto) => staffApi.create(data),
     onSuccess: () => {
-      message.success('Xodim qo\'shildi')
+      message.success("Xodim muvaffaqiyatli qo'shildi")
       queryClient.invalidateQueries({ queryKey: ['staff'] })
       setModalOpen(false)
       form.resetFields()
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: Record<string, unknown> } }
+      const d = e?.response?.data
+      if (d) {
+        const msgs = Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        message.error(msgs.join(' | '), 6)
+      } else {
+        message.error("Xodim qo'shishda xatolik yuz berdi")
+      }
+    },
   })
 
   const archiveMutation = useMutation({
@@ -67,7 +76,7 @@ export default function StaffList() {
       message.success('Xodim arxivlandi')
       queryClient.invalidateQueries({ queryKey: ['staff'] })
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error('Arxivlashda xatolik yuz berdi'),
   })
 
   const displayData = data?.data ?? []

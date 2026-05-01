@@ -10,6 +10,7 @@ const normalize = (r: Record<string, unknown>): Room => ({
   pricePerNight:  Number(r.price_per_night),
   status:         r.status as RoomStatus,
   description:    r.description as string | undefined,
+  floor:          r.floor as number | undefined,
   createdAt:      r.created_at as string,
   updatedAt:      r.updated_at as string,
 })
@@ -24,9 +25,10 @@ export const roomsApi = {
   }): Promise<PaginatedResponse<Room>> => {
     const response = await axiosInstance.get('/rooms/', {
       params: {
-        room_type: params?.type,
-        status:    params?.status,
-        page:      params?.page,
+        room_type:  params?.type,
+        status:     params?.status,
+        page:       params?.page,
+        page_size:  params?.pageSize ?? 200,   // barcha xonalarni olish uchun
       },
     })
     const data = response.data
@@ -75,6 +77,7 @@ export const roomsApi = {
       capacity:        data.capacity,
       price_per_night: data.pricePerNight,
       description:     data.description,
+      floor:           data.floor ?? 1,
     })
     return normalize(response.data)
   },

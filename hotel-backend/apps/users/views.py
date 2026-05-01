@@ -11,7 +11,7 @@ from .serializers import (
     UserProfileSerializer, UserUpdateSerializer,
     ChangePasswordSerializer, AdminUserSerializer,
 )
-from .permissions import IsAdmin
+from .permissions import IsAdmin, IsAdminOrManager
 
 User = get_user_model()
 
@@ -79,8 +79,8 @@ class ChangePasswordView(APIView):
 
 
 class UserListCreateView(generics.ListCreateAPIView):
-    """GET/POST /api/v1/auth/users/  (admin only)"""
-    permission_classes = [IsAdmin]
+    """GET/POST /api/v1/auth/users/  (admin/manager)"""
+    permission_classes = [IsAdminOrManager]
     serializer_class   = AdminUserSerializer
 
     def get_queryset(self):
@@ -92,8 +92,8 @@ class UserListCreateView(generics.ListCreateAPIView):
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PUT/DELETE /api/v1/auth/users/<id>/  (admin only)"""
-    permission_classes = [IsAdmin]
+    """GET/PUT/DELETE /api/v1/auth/users/<id>/  (admin/manager)"""
+    permission_classes = [IsAdminOrManager]
     serializer_class   = AdminUserSerializer
     queryset           = User.objects.all()
 

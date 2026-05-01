@@ -48,8 +48,8 @@ export const paymentsApi = {
   // POST /api/v1/payments/
   processPayment: async (data: ProcessPaymentDto): Promise<Payment> => {
     const response = await axiosInstance.post('/payments/', {
-      booking: Number(data.bookingId),
-      amount:  data.amount,
+      booking: Number(data.bookingId),   // backend integer kutadi
+      amount:  Number(data.amount),
       method:  data.method,
     })
     return normalizePayment(response.data)
