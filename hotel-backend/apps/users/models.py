@@ -36,6 +36,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name  = models.CharField(max_length=50)
     phone      = models.CharField(max_length=20, blank=True)
     role       = models.CharField(max_length=20, choices=Role.choices, default=Role.CUSTOMER)
+    avatar     = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name='Rasm')
     is_active  = models.BooleanField(default=True)
     is_staff   = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -7,8 +7,6 @@ User = get_user_model()
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Adds user info to JWT token payload."""
-
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -21,7 +19,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        data['user'] = UserProfileSerializer(self.user).data
+        data['user'] = UserProfileSerializer(self.user, context=self.context).data
         return data
 
 
@@ -43,22 +41,31 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
+    full_name  = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name',
-                  'full_name', 'phone', 'role', 'created_at']
-        read_only_fields = ['id', 'created_at']
+                  'full_name', 'phone', 'role', 'avatar', 'avatar_url', 'created_at']
+        read_only_fields = ['id', 'created_at', 'avatar_url']
 
     def get_full_name(self, obj):
         return obj.get_full_name()
+
+    def get_avatar_url(self, obj):
+        request = self.context.get('request')
+        if obj.avatar:
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model  = User
-        fields = ['first_name', 'last_name', 'phone', 'email']
+        fields = ['first_name', 'last_name', 'phone', 'email', 'avatar']
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -72,13 +79,22 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class AdminUserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password   = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name',
-                  'phone', 'role', 'is_active', 'password', 'created_at']
-        read_only_fields = ['id', 'created_at']
+                  'phone', 'role', 'is_active', 'password', 'avatar', 'avatar_url', 'created_at']
+        read_only_fields = ['id', 'created_at', 'avatar_url']
+
+    def get_avatar_url(self, obj):
+        request = self.context.get('request')
+        if obj.avatar:
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
     def create(self, validated_data):
         password = validated_data.pop('password')

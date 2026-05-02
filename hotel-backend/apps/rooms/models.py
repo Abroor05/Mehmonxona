@@ -20,6 +20,8 @@ class Room(models.Model):
     status          = models.CharField(max_length=20, choices=Status.choices, default=Status.AVAILABLE)
     description     = models.TextField(blank=True)
     floor           = models.PositiveSmallIntegerField(default=1)
+    # Xona ichidagi qulayliklar (vergul bilan ajratilgan)
+    amenities       = models.TextField(blank=True, help_text="Vergul bilan ajrating: WiFi, TV, Konditsioner")
     created_at      = models.DateTimeField(auto_now_add=True)
     updated_at      = models.DateTimeField(auto_now=True)
 
@@ -33,6 +35,34 @@ class Room(models.Model):
     @property
     def is_available(self):
         return self.status == self.Status.AVAILABLE
+
+    def get_amenities_list(self):
+        if not self.amenities:
+            return []
+        return [a.strip() for a in self.amenities.split(',') if a.strip()]
+
+
+class RoomImage(models.Model):
+    """Xona rasmlari — har bir xona uchun bir nechta rasm"""
+    room       = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='images')
+    image      = models.ImageField(upload_to='rooms/%Y/%m/', verbose_name='Rasm')
+    caption    = models.CharField(max_length=100, blank=True, verbose_name='Tavsif')
+    is_primary = models.BooleanField(default=False, verbose_name='Asosiy rasm')
+    order      = models.PositiveSmallIntegerField(default=0, verbose_name='Tartib')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'room_images'
+        ordering = ['order', 'uploaded_at']
+
+    def __str__(self):
+        return f'Xona {self.room.room_number} — rasm {self.id}'
+
+    def save(self, *args, **kwargs):
+        # Agar is_primary=True bo'lsa, boshqa rasmlarni primary emas qilish
+        if self.is_primary:
+            RoomImage.objects.filter(room=self.room, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
 
 
 class RoomStatusLog(models.Model):

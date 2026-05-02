@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Table, Button, Input, Space, Typography, Modal, Form,
-  message, Tooltip, Card, Row, Col,
+  message, Tooltip, Card, Row, Col, Avatar, Upload,
 } from 'antd'
 import {
   PlusOutlined, SearchOutlined, EditOutlined,
-  DeleteOutlined, EyeOutlined, UserOutlined,
+  DeleteOutlined, EyeOutlined, UserOutlined, CameraOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import type { UploadFile } from 'antd/es/upload/interface'
 import { guestsApi } from '../../api/guests'
 import { Guest, CreateGuestDto } from '../../types'
 import { useAuthStore } from '../../store/authStore'
@@ -20,10 +21,12 @@ const { Search } = Input
 export default function GuestList() {
   const queryClient = useQueryClient()
   const { hasRole } = useAuthStore()
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingGuest, setEditingGuest] = useState<Guest | null>(null)
+  const [search,        setSearch]        = useState('')
+  const [page,          setPage]          = useState(1)
+  const [modalOpen,     setModalOpen]     = useState(false)
+  const [editingGuest,  setEditingGuest]  = useState<Guest | null>(null)
+  const [avatarFile,    setAvatarFile]    = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [form] = Form.useForm()
 
   const { data, isLoading } = useQuery({
@@ -32,55 +35,63 @@ export default function GuestList() {
     retry: false,
   })
 
+  // ── Mijoz qo'shish ───────────────────────────────────────────────────────
   const createMutation = useMutation({
-    mutationFn: (data: CreateGuestDto) => guestsApi.create(data),
+    mutationFn: (values: CreateGuestDto) =>
+      guestsApi.create({ ...values, avatarFile: avatarFile ?? undefined }),
     onSuccess: () => {
-      message.success('Mijoz muvaffaqiyatli qo\'shildi')
+      message.success("Mijoz muvaffaqiyatli qo'shildi")
       queryClient.invalidateQueries({ queryKey: ['guests'] })
-      setModalOpen(false)
-      form.resetFields()
+      closeModal()
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: Record<string, string[]> } }
       const errors = e?.response?.data
       if (errors) {
-        const msg = Object.values(errors).flat().join(' | ')
-        message.error(msg)
+        message.error(Object.values(errors).flat().join(' | '), 6)
       } else {
-        message.error('Mijoz qo\'shishda xatolik yuz berdi')
+        message.error("Mijoz qo'shishda xatolik yuz berdi")
       }
     },
   })
 
+  // ── Mijozni yangilash ────────────────────────────────────────────────────
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CreateGuestDto }) => guestsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: CreateGuestDto }) =>
+      guestsApi.update(id, data),
     onSuccess: () => {
-      message.success('Mijoz ma\'lumotlari yangilandi')
+      message.success("Mijoz ma'lumotlari yangilandi")
       queryClient.invalidateQueries({ queryKey: ['guests'] })
-      setModalOpen(false)
-      setEditingGuest(null)
-      form.resetFields()
+      closeModal()
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: Record<string, string[]> } }
       const errors = e?.response?.data
       if (errors) {
-        const msg = Object.values(errors).flat().join(' | ')
-        message.error(msg)
+        message.error(Object.values(errors).flat().join(' | '), 6)
       } else {
         message.error('Yangilashda xatolik yuz berdi')
       }
     },
   })
 
+  // ── Mijozni o'chirish ────────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (id: string) => guestsApi.delete(id),
     onSuccess: () => {
-      message.success('Mijoz o\'chirildi')
+      message.success("Mijoz o'chirildi")
       queryClient.invalidateQueries({ queryKey: ['guests'] })
     },
-    onError: () => message.error('O\'chirishda xatolik yuz berdi'),
+    onError: () => message.error("O'chirishda xatolik yuz berdi"),
   })
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setEditingGuest(null)
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    form.resetFields()
+  }
 
   const handleSubmit = (values: CreateGuestDto) => {
     if (editingGuest) {
@@ -92,19 +103,39 @@ export default function GuestList() {
 
   const handleEdit = (guest: Guest) => {
     setEditingGuest(guest)
-    form.setFieldsValue(guest)
+    setAvatarPreview(guest.avatarUrl ?? null)
+    form.setFieldsValue({
+      firstName: guest.firstName,
+      lastName:  guest.lastName,
+      phone:     guest.phone,
+      email:     guest.email,
+    })
     setModalOpen(true)
   }
 
   const handleDelete = (id: string) => {
     Modal.confirm({
-      title: 'Mijozni o\'chirish',
-      content: 'Haqiqatan ham bu mijozni o\'chirmoqchimisiz?',
-      okText: 'Ha, o\'chirish',
+      title: "Mijozni o'chirish",
+      content: "Haqiqatan ham bu mijozni o'chirmoqchimisiz?",
+      okText: "Ha, o'chirish",
       cancelText: 'Bekor qilish',
       okButtonProps: { danger: true },
       onOk: () => deleteMutation.mutate(id),
     })
+  }
+
+  // Rasm tanlash
+  const handleAvatarChange = (info: { fileList: UploadFile[] }) => {
+    const file = info.fileList[0]?.originFileObj
+    if (file) {
+      setAvatarFile(file)
+      const reader = new FileReader()
+      reader.onload = (e) => setAvatarPreview(e.target?.result as string)
+      reader.readAsDataURL(file)
+    } else {
+      setAvatarFile(null)
+      setAvatarPreview(null)
+    }
   }
 
   const displayData = data?.data ?? []
@@ -113,16 +144,24 @@ export default function GuestList() {
     {
       title: '#',
       key: 'index',
-      width: 60,
+      width: 50,
       render: (_, __, index) => (page - 1) * 10 + index + 1,
     },
     {
-      title: 'Ism Familiya',
+      title: 'Mijoz',
       key: 'name',
       render: (_, record) => (
         <Space>
-          <UserOutlined style={{ color: '#1677ff' }} />
-          <span>{record.firstName} {record.lastName}</span>
+          <Avatar
+            size={36}
+            src={record.avatarUrl}
+            icon={<UserOutlined />}
+            style={{ backgroundColor: '#1677ff', flexShrink: 0 }}
+          />
+          <div>
+            <div style={{ fontWeight: 600 }}>{record.firstName} {record.lastName}</div>
+            <div style={{ fontSize: 12, color: '#999' }}>{record.email}</div>
+          </div>
         </Space>
       ),
     },
@@ -132,14 +171,9 @@ export default function GuestList() {
       key: 'phone',
     },
     {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
       title: 'Amallar',
       key: 'actions',
-      width: 140,
+      width: 120,
       render: (_, record) => (
         <Space>
           <Tooltip title="Ko'rish">
@@ -147,12 +181,23 @@ export default function GuestList() {
           </Tooltip>
           {hasRole([StaffRole.ADMIN, StaffRole.MANAGER, StaffRole.RECEPTIONIST]) && (
             <Tooltip title="Tahrirlash">
-              <Button type="text" icon={<EditOutlined />} size="small" onClick={() => handleEdit(record)} />
+              <Button
+                type="text"
+                icon={<EditOutlined />}
+                size="small"
+                onClick={() => handleEdit(record)}
+              />
             </Tooltip>
           )}
           {hasRole([StaffRole.ADMIN]) && (
             <Tooltip title="O'chirish">
-              <Button type="text" danger icon={<DeleteOutlined />} size="small" onClick={() => handleDelete(record.id)} />
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                size="small"
+                onClick={() => handleDelete(record.id)}
+              />
             </Tooltip>
           )}
         </Space>
@@ -204,13 +249,13 @@ export default function GuestList() {
         />
       </Card>
 
-      {/* Qo'shish/Tahrirlash modali */}
+      {/* ── Qo'shish / Tahrirlash modali ── */}
       <Modal
-        title={editingGuest ? 'Mijozni tahrirlash' : 'Yangi mijoz qo\'shish'}
+        title={editingGuest ? 'Mijozni tahrirlash' : "Yangi mijoz qo'shish"}
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); setEditingGuest(null); form.resetFields() }}
+        onCancel={closeModal}
         footer={null}
-        width={600}
+        width={520}
       >
         <Form
           form={form}
@@ -218,18 +263,62 @@ export default function GuestList() {
           onFinish={handleSubmit}
           style={{ marginTop: 16 }}
         >
+          {/* ── Profil rasmi ── */}
+          <Form.Item label="Profil rasmi" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Avatar
+                size={80}
+                src={avatarPreview}
+                icon={<UserOutlined />}
+                style={{ backgroundColor: '#1677ff', flexShrink: 0 }}
+              />
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                beforeUpload={() => false}
+                onChange={handleAvatarChange}
+                maxCount={1}
+              >
+                <Button icon={<CameraOutlined />}>
+                  {avatarPreview ? "Rasmni o'zgartirish" : 'Rasm tanlash'}
+                </Button>
+              </Upload>
+              {avatarPreview && (
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                >
+                  Olib tashlash
+                </Button>
+              )}
+            </div>
+          </Form.Item>
+
+          {/* ── Ism / Familiya ── */}
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="firstName" label="Ism" rules={[{ required: true, message: 'Ismni kiriting' }]}>
+              <Form.Item
+                name="firstName"
+                label="Ism"
+                rules={[{ required: true, message: 'Ismni kiriting' }]}
+              >
                 <Input placeholder="Ism" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="lastName" label="Familiya" rules={[{ required: true, message: 'Familiyani kiriting' }]}>
+              <Form.Item
+                name="lastName"
+                label="Familiya"
+                rules={[{ required: true, message: 'Familiyani kiriting' }]}
+              >
                 <Input placeholder="Familiya" />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* ── Telefon ── */}
           <Form.Item
             name="phone"
             label="Telefon raqami"
@@ -240,6 +329,8 @@ export default function GuestList() {
           >
             <Input placeholder="+998901234567" />
           </Form.Item>
+
+          {/* ── Email ── */}
           <Form.Item
             name="email"
             label="Email"
@@ -250,15 +341,16 @@ export default function GuestList() {
           >
             <Input placeholder="email@example.com" />
           </Form.Item>
+
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => { setModalOpen(false); form.resetFields() }}>Bekor qilish</Button>
+              <Button onClick={closeModal}>Bekor qilish</Button>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={createMutation.isPending || updateMutation.isPending}
               >
-                {editingGuest ? 'Saqlash' : 'Qo\'shish'}
+                {editingGuest ? 'Saqlash' : "Qo'shish"}
               </Button>
             </Space>
           </Form.Item>

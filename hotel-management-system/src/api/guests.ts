@@ -3,15 +3,16 @@ import { Guest, CreateGuestDto, UpdateGuestDto, PaginatedResponse } from '../typ
 
 // Helper: normalize Django user fields (snake_case → camelCase)
 const normalize = (u: Record<string, unknown>): Guest => ({
-  id:            String(u.id),
-  firstName:     u.first_name as string,
-  lastName:      u.last_name as string,
-  passportNumber: '',   // Django User modelida passport_number yo'q
-  phone:         u.phone as string || '',
-  email:         u.email as string,
-  nationality:   undefined,
-  createdAt:     u.created_at as string,
-  updatedAt:     u.updated_at as string,
+  id:             String(u.id),
+  firstName:      u.first_name as string,
+  lastName:       u.last_name as string,
+  passportNumber: '',
+  phone:          u.phone as string || '',
+  email:          u.email as string,
+  nationality:    undefined,
+  avatarUrl:      (u.avatar_url || u.avatar) as string | undefined,
+  createdAt:      u.created_at as string,
+  updatedAt:      u.updated_at as string,
 })
 
 export const guestsApi = {
@@ -56,9 +57,27 @@ export const guestsApi = {
     return normalize(response.data)
   },
 
-  create: async (data: CreateGuestDto): Promise<Guest> => {
-    // username = email dan oldin + timestamp (unique bo'lishi uchun)
+  create: async (data: CreateGuestDto & { avatarFile?: File }): Promise<Guest> => {
     const username = data.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_') + '_' + Date.now()
+
+    // Agar rasm bo'lsa — multipart/form-data
+    if (data.avatarFile) {
+      const formData = new FormData()
+      formData.append('username',   username)
+      formData.append('first_name', data.firstName)
+      formData.append('last_name',  data.lastName)
+      formData.append('phone',      data.phone || '')
+      formData.append('email',      data.email)
+      formData.append('role',       'customer')
+      formData.append('password',   'TempPass123!')
+      formData.append('avatar',     data.avatarFile)
+      const response = await axiosInstance.post('/auth/users/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return normalize(response.data)
+    }
+
+    // Rasmsiz — JSON
     const response = await axiosInstance.post('/auth/users/', {
       username,
       first_name: data.firstName,

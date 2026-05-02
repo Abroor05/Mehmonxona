@@ -13,6 +13,7 @@ export interface Guest {
   phone: string
   email: string
   nationality?: string
+  avatarUrl?: string
   createdAt: string
   updatedAt: string
 }
@@ -29,6 +30,15 @@ export interface CreateGuestDto {
 export interface UpdateGuestDto extends Partial<CreateGuestDto> {}
 
 // ==================== ROOM ====================
+export interface RoomImage {
+  id:         string
+  imageUrl:   string
+  caption?:   string
+  isPrimary:  boolean
+  order:      number
+  uploadedAt: string
+}
+
 export interface Room {
   id: string
   roomNumber: string
@@ -39,6 +49,8 @@ export interface Room {
   description?: string
   amenities?: string[]
   floor?: number
+  images?: RoomImage[]
+  primaryImage?: string
   createdAt: string
   updatedAt: string
 }
@@ -49,12 +61,13 @@ export interface CreateRoomDto {
   capacity: number
   pricePerNight: number
   description?: string
-  amenities?: string[]
+  amenities?: string[] | string
   floor?: number
 }
 
-export interface UpdateRoomDto extends Partial<CreateRoomDto> {
+export interface UpdateRoomDto extends Partial<Omit<CreateRoomDto, 'amenities'>> {
   status?: RoomStatus
+  amenities?: string[] | string
 }
 
 export interface UpdateRoomStatusDto {

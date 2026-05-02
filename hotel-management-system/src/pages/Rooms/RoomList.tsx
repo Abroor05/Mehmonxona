@@ -15,6 +15,7 @@ import { Room, CreateRoomDto } from '../../types'
 import { RoomType, RoomStatus } from '../../types/enums'
 import { useAuthStore } from '../../store/authStore'
 import { StaffRole } from '../../types/enums'
+import RoomDetail from './RoomDetail'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -60,6 +61,8 @@ export default function RoomList() {
 
   // Tanlangan qavat (null = qavat ro'yxati ko'rinadi)
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null)
+  // Tanlangan xona detail (null = xona ro'yxati ko'rinadi)
+  const [detailRoom,    setDetailRoom]    = useState<Room | null>(null)
 
   // Filterlar (xonalar ko'rinishida)
   const [filterType,   setFilterType]   = useState<RoomType   | 'ALL'>('ALL')
@@ -68,7 +71,7 @@ export default function RoomList() {
   // Modallar
   const [addModalOpen,    setAddModalOpen]    = useState(false)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
-  const [selectedRoom,    setSelectedRoom]    = useState<Room | null>(null)
+  const [statusRoom,      setStatusRoom]      = useState<Room | null>(null)
   const [form]       = Form.useForm()
   const [statusForm] = Form.useForm()
 
@@ -131,11 +134,21 @@ export default function RoomList() {
     : []
 
   // ── Umumiy statistika ────────────────────────────────────────────────────
-  const totalRooms    = allRooms.length
+  const totalRooms     = allRooms.length
   const availableCount = allRooms.filter((r) => r.status === RoomStatus.AVAILABLE).length
   const occupiedCount  = allRooms.filter((r) => r.status === RoomStatus.OCCUPIED).length
   const cleaningCount  = allRooms.filter((r) => r.status === RoomStatus.CLEANING).length
   const maintCount     = allRooms.filter((r) => r.status === RoomStatus.MAINTENANCE).length
+
+  // ── Xona detail ko'rinishi ───────────────────────────────────────────────
+  if (detailRoom) {
+    return (
+      <RoomDetail
+        room={detailRoom}
+        onBack={() => setDetailRoom(null)}
+      />
+    )
+  }
 
   // ── Qavat rangi (bandlik foiziga qarab) ──────────────────────────────────
   const floorColor = (floor: number): string => {
@@ -443,9 +456,11 @@ export default function RoomList() {
               <Col key={room.id} xs={24} sm={12} md={8} lg={6} xl={4}>
                 <Card
                   hoverable
+                  onClick={() => setDetailRoom(room)}
                   style={{
                     borderTop: `3px solid ${cfg.color}`,
                     background: cfg.bg,
+                    cursor: 'pointer',
                   }}
                   styles={{ body: { padding: '14px' } }}
                   actions={
@@ -455,7 +470,11 @@ export default function RoomList() {
                           type="text"
                           size="small"
                           icon={<EditOutlined />}
-                          onClick={() => { setSelectedRoom(room); setStatusModalOpen(true) }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setStatusRoom(room)
+                            setStatusModalOpen(true)
+                          }}
                         >
                           Holat
                         </Button>
@@ -584,7 +603,7 @@ export default function RoomList() {
 
       {/* Holat o'zgartirish modali */}
       <Modal
-        title={`Xona ${selectedRoom?.roomNumber} — holat o'zgartirish`}
+        title={`Xona ${statusRoom?.roomNumber} — holat o'zgartirish`}
         open={statusModalOpen}
         onCancel={() => { setStatusModalOpen(false); statusForm.resetFields() }}
         footer={null}
@@ -592,7 +611,7 @@ export default function RoomList() {
         <Form
           form={statusForm}
           layout="vertical"
-          onFinish={(v) => selectedRoom && updateStatusMutation.mutate({ id: selectedRoom.id, ...v })}
+          onFinish={(v) => statusRoom && updateStatusMutation.mutate({ id: statusRoom.id, ...v })}
           style={{ marginTop: 16 }}
         >
           <Form.Item name="status" label="Yangi holat" rules={[{ required: true }]}>

@@ -1,28 +1,22 @@
-"""
-Room views — fixed version.
-
-Fixes:
-1. AvailableRoomsView properly handles missing query params
-2. RoomStatusUpdateView logs changes correctly
-3. All views return proper status codes
-"""
-
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-from .models import Room, RoomStatusLog
-from .serializers import RoomSerializer, RoomStatusUpdateSerializer, RoomStatusLogSerializer
+from .models import Room, RoomImage, RoomStatusLog
+from .serializers import (
+    RoomSerializer, RoomImageSerializer,
+    RoomStatusUpdateSerializer, RoomStatusLogSerializer,
+)
 from apps.users.permissions import IsAdminOrManager, IsStaffMember
 
 
 class RoomListCreateView(generics.ListCreateAPIView):
     """
-    GET  /api/v1/rooms/  — list all rooms
-    POST /api/v1/rooms/  — create room (admin/manager only)
-
-    Filters: ?status=available&room_type=vip&floor=2
+    GET  /api/v1/rooms/        — barcha xonalar ro'yxati
+    POST /api/v1/rooms/        — yangi xona (admin/manager)
+    Filters: ?status=available&room_type=vip&floor=2&page_size=200
     """
     serializer_class = RoomSerializer
 
@@ -32,7 +26,7 @@ class RoomListCreateView(generics.ListCreateAPIView):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        qs = Room.objects.all()
+        qs = Room.objects.prefetch_related('images').all()
         if s := self.request.query_params.get('status'):
             qs = qs.filter(status=s)
         if t := self.request.query_params.get('room_type'):
@@ -40,6 +34,11 @@ class RoomListCreateView(generics.ListCreateAPIView):
         if f := self.request.query_params.get('floor'):
             qs = qs.filter(floor=f)
         return qs
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -50,11 +49,11 @@ class RoomListCreateView(generics.ListCreateAPIView):
 
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    GET    /api/v1/rooms/<id>/
-    PUT    /api/v1/rooms/<id>/
-    DELETE /api/v1/rooms/<id>/
+    GET    /api/v1/rooms/<id>/  — xona to'liq ma'lumoti (rasmlar bilan)
+    PUT    /api/v1/rooms/<id>/  — yangilash (admin/manager)
+    DELETE /api/v1/rooms/<id>/  — o'chirish (admin/manager)
     """
-    queryset         = Room.objects.all()
+    queryset         = Room.objects.prefetch_related('images').all()
     serializer_class = RoomSerializer
 
     def get_permissions(self):
@@ -62,22 +61,121 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
             return [IsAuthenticated()]
         return [IsAdminOrManager()]
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
+
+
+class RoomImageUploadView(APIView):
+    """
+    POST   /api/v1/rooms/<pk>/images/   — rasm yuklash (admin/manager)
+    GET    /api/v1/rooms/<pk>/images/   — rasmlar ro'yxati
+    """
+    permission_classes = [IsAdminOrManager]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request, pk):
+        try:
+            room = Room.objects.get(pk=pk)
+        except Room.DoesNotExist:
+            return Response({'error': 'Xona topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+        images = room.images.all()
+        serializer = RoomImageSerializer(images, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request, pk):
+        try:
+            room = Room.objects.get(pk=pk)
+        except Room.DoesNotExist:
+            return Response({'error': 'Xona topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Bir nechta rasm yuklash
+        files   = request.FILES.getlist('images')
+        caption = request.data.get('caption', '')
+
+        if not files:
+            return Response({'error': 'Kamida bitta rasm yuklang.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Maksimal 10 ta rasm
+        existing_count = room.images.count()
+        if existing_count + len(files) > 10:
+            return Response(
+                {'error': f'Xona uchun maksimal 10 ta rasm. Hozir {existing_count} ta bor.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        created = []
+        for i, file in enumerate(files):
+            is_primary = (existing_count == 0 and i == 0)  # Birinchi rasm primary
+            img = RoomImage.objects.create(
+                room=room,
+                image=file,
+                caption=caption,
+                is_primary=is_primary,
+                order=existing_count + i,
+            )
+            created.append(img)
+
+        serializer = RoomImageSerializer(created, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class RoomImageDeleteView(APIView):
+    """DELETE /api/v1/rooms/<pk>/images/<image_id>/"""
+    permission_classes = [IsAdminOrManager]
+
+    def delete(self, request, pk, image_id):
+        try:
+            image = RoomImage.objects.get(pk=image_id, room_id=pk)
+        except RoomImage.DoesNotExist:
+            return Response({'error': 'Rasm topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Faylni diskdan o'chirish
+        if image.image:
+            try:
+                image.image.delete(save=False)
+            except Exception:
+                pass
+        image.delete()
+
+        # Agar primary rasm o'chirilsa, keyingisini primary qilish
+        remaining = RoomImage.objects.filter(room_id=pk).order_by('order')
+        if remaining.exists() and not remaining.filter(is_primary=True).exists():
+            first = remaining.first()
+            first.is_primary = True
+            first.save(update_fields=['is_primary'])
+
+        return Response({'message': 'Rasm o\'chirildi.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class RoomImageSetPrimaryView(APIView):
+    """PATCH /api/v1/rooms/<pk>/images/<image_id>/primary/"""
+    permission_classes = [IsAdminOrManager]
+
+    def patch(self, request, pk, image_id):
+        try:
+            image = RoomImage.objects.get(pk=image_id, room_id=pk)
+        except RoomImage.DoesNotExist:
+            return Response({'error': 'Rasm topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+        RoomImage.objects.filter(room_id=pk, is_primary=True).update(is_primary=False)
+        image.is_primary = True
+        image.save(update_fields=['is_primary'])
+
+        return Response({'message': 'Asosiy rasm o\'rnatildi.'})
+
 
 class RoomStatusUpdateView(APIView):
-    """
-    PATCH /api/v1/rooms/<id>/status/
-    Body: {"status": "cleaning", "reason": "Guest checked out"}
-    """
+    """PATCH /api/v1/rooms/<id>/status/"""
     permission_classes = [IsStaffMember]
 
     def patch(self, request, pk):
         try:
             room = Room.objects.get(pk=pk)
         except Room.DoesNotExist:
-            return Response(
-                {'error': 'Room not found.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({'error': 'Xona topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = RoomStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -85,7 +183,6 @@ class RoomStatusUpdateView(APIView):
         old_status = room.status
         new_status = serializer.validated_data['status']
 
-        # Log the status change
         RoomStatusLog.objects.create(
             room=room,
             old_status=old_status,
@@ -98,29 +195,27 @@ class RoomStatusUpdateView(APIView):
         room.save(update_fields=['status', 'updated_at'])
 
         return Response({
-            'message': f'Room status changed from {old_status} to {new_status}.',
-            'room': RoomSerializer(room).data,
+            'message': f'Xona holati {old_status} dan {new_status} ga o\'zgartirildi.',
+            'room': RoomSerializer(room, context={'request': request}).data,
         })
 
 
 class AvailableRoomsView(generics.ListAPIView):
-    """
-    GET /api/v1/rooms/available/
-    Query params: check_in, check_out, room_type (optional), capacity (optional)
-
-    Example: /api/v1/rooms/available/?check_in=2024-05-01&check_out=2024-05-05
-    """
+    """GET /api/v1/rooms/available/?check_in=&check_out="""
     serializer_class   = RoomSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def get_queryset(self):
         check_in  = self.request.query_params.get('check_in')
         check_out = self.request.query_params.get('check_out')
 
-        # Start with all available rooms
-        qs = Room.objects.filter(status=Room.Status.AVAILABLE)
+        qs = Room.objects.prefetch_related('images').filter(status=Room.Status.AVAILABLE)
 
-        # If dates provided, exclude rooms with overlapping bookings
         if check_in and check_out:
             from apps.bookings.models import Booking
             booked_ids = Booking.objects.filter(
@@ -130,7 +225,6 @@ class AvailableRoomsView(generics.ListAPIView):
             ).values_list('room_id', flat=True)
             qs = qs.exclude(id__in=booked_ids)
 
-        # Optional filters
         if t := self.request.query_params.get('room_type'):
             qs = qs.filter(room_type=t)
         if cap := self.request.query_params.get('capacity'):
